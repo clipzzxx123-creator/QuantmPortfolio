@@ -72,33 +72,82 @@ const AnimatedBackground = () => {
 };
 
 // --- Music Playlist Component ---
-const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackChange, audioRef }) => (
-  <div className="flex items-center justify-center gap-6 mt-12">
-    <audio ref={audioRef} />
-    <button
-      onClick={() => onTrackChange(-1)}
-      className="text-white/60 hover:text-white transition-colors"
-    >
-      <SkipBack size={24} />
-    </button>
-    
-    <button
-      onClick={onPlayPause}
-      className="bg-white text-black p-3 rounded-full hover:bg-zinc-200 transition-all font-black"
-    >
-      {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-    </button>
-    
-    <button
-      onClick={() => onTrackChange(1)}
-      className="text-white/60 hover:text-white transition-colors"
-    >
-      <SkipForward size={24} />
-    </button>
-    
-    <p className="text-white font-bold text-sm truncate max-w-xs">{tracks[currentTrack]?.title || 'No tracks'}</p>
-  </div>
-);
+const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackChange, audioRef, currentTime, duration, volume, onVolumeChange, onSeek }) => {
+  const formatTime = (time) => {
+    if (!time || isNaN(time)) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="w-full max-w-2xl mx-auto mt-12">
+      <audio ref={audioRef} crossOrigin="anonymous" />
+      
+      {/* Progress Bar */}
+      <div className="mb-4 space-y-2">
+        <input
+          type="range"
+          min="0"
+          max={duration || 100}
+          value={currentTime}
+          onChange={(e) => {
+            if (audioRef.current) {
+              audioRef.current.currentTime = parseFloat(e.target.value);
+              onSeek(parseFloat(e.target.value));
+            }
+          }}
+          className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white"
+        />
+        <div className="flex justify-between text-xs text-white/40 font-bold">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center justify-center gap-6">
+        <button
+          onClick={() => onTrackChange(-1)}
+          className="text-white/60 hover:text-white transition-colors"
+        >
+          <SkipBack size={24} />
+        </button>
+        
+        <button
+          onClick={onPlayPause}
+          className="bg-white text-black p-3 rounded-full hover:bg-zinc-200 transition-all font-black"
+        >
+          {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+        </button>
+        
+        <button
+          onClick={() => onTrackChange(1)}
+          className="text-white/60 hover:text-white transition-colors"
+        >
+          <SkipForward size={24} />
+        </button>
+        
+        <p className="text-white font-bold text-sm truncate max-w-xs flex-1">{tracks[currentTrack]?.title || 'No tracks'}</p>
+
+        {/* Volume Slider */}
+        <div className="flex items-center gap-2">
+          <span className="text-white/40 text-xs font-bold">VOL</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={volume}
+            onChange={(e) => onVolumeChange(parseInt(e.target.value))}
+            className="w-20 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- Portfolio Grid Item ---
 const PortfolioItem = ({ item, categoryId, onClick }) => (
@@ -151,6 +200,9 @@ export default function App() {
   // Music Player State
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(60);
   const audioRef = useRef(null);
   const [musicTracks, setMusicTracks] = useState(() => {
     const saved = localStorage.getItem('quantm_music_tracks_v1');
@@ -169,6 +221,12 @@ export default function App() {
 
   useEffect(() => {
     if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
+    }
+  }, [volume]);
+
+  useEffect(() => {
+    if (audioRef.current) {
       if (isPlaying && musicTracks[currentTrack]?.url) {
         audioRef.current.src = musicTracks[currentTrack].url;
         audioRef.current.play();
@@ -177,6 +235,27 @@ export default function App() {
       }
     }
   }, [currentTrack, isPlaying, musicTracks]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => {
+      setCurrentTrack((prev) => (prev + 1) % musicTracks.length);
+    };
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [musicTracks]);
   
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -678,6 +757,11 @@ export default function App() {
             onPlayPause={handlePlayPause}
             onTrackChange={handleTrackChange}
             audioRef={audioRef}
+            currentTime={currentTime}
+            duration={duration}
+            volume={volume}
+            onVolumeChange={setVolume}
+            onSeek={setCurrentTime}
           />
           <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
             <button onClick={() => scrollToSection(null, 'pfp')} className="bg-white text-black px-12 py-4 rounded-full font-black text-[11px] tracking-[0.2em] hover:scale-105 transition-transform duration-300 shadow-2xl shadow-white/10">VIEW SHOWREEL</button>
