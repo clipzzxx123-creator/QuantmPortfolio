@@ -74,7 +74,6 @@ const AnimatedBackground = () => {
         }
       }
       update() { this.life -= 0.03; }
-
       draw() {
         if (this.life <= 0) return;
         ctx.strokeStyle = `rgba(255, 255, 255, ${this.life * 0.15})`;
@@ -106,7 +105,6 @@ const AnimatedBackground = () => {
       if (Math.random() > 0.996 && bolts.length < 2) bolts.push(new Bolt());
       bolts = bolts.filter(b => b.life > 0);
       bolts.forEach(b => { b.update(); b.draw(); });
-
       particles.forEach(p => { p.update(); p.draw(); });
       animationFrameId = requestAnimationFrame(animate);
     };
