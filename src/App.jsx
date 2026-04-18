@@ -18,8 +18,6 @@ const AnimatedBackground = () => {
     const ctx = canvas.getContext('2d', { alpha: false });
     let animationFrameId;
     let particles = [];
-    let strikes = [];
-    let strikeCooldown = 40 + Math.random() * 140;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -51,140 +49,6 @@ const AnimatedBackground = () => {
       }
     }
 
-    class LightningStrike {
-      constructor() {
-        this.channels = [];
-        this.age = 0;
-        this.maxAge = 20 + Math.random() * 12;
-        this.strikeX = canvas.width * (0.1 + Math.random() * 0.8);
-        this.endY = canvas.height * (0.62 + Math.random() * 0.34);
-        this.returnPulse = 1;
-        this.intensity = 1;
-        this.build();
-      }
-
-      createPath(startX, startY, endY, stepY, spread, directionBias = 0) {
-        const points = [{ x: startX, y: startY }];
-        let curX = startX;
-        let curY = startY;
-
-        while (curY < endY) {
-          const jitter = (Math.random() - 0.5) * spread + directionBias;
-          curX += jitter;
-          curY += stepY * (0.75 + Math.random() * 0.6);
-          curX = Math.max(-80, Math.min(canvas.width + 80, curX));
-          points.push({ x: curX, y: curY });
-          if (points.length > 36) break;
-        }
-
-        return points;
-      }
-
-      build() {
-        const trunk = this.createPath(
-          this.strikeX,
-          -20,
-          this.endY,
-          canvas.height / 18,
-          80
-        );
-        this.channels.push({
-          points: trunk,
-          width: 2.3,
-          glow: 30,
-          alpha: 1.15,
-          jitter: 2.8,
-        });
-
-        for (let i = 2; i < trunk.length - 2; i++) {
-          if (Math.random() < 0.34 && this.channels.length < 6) {
-            const anchor = trunk[i];
-            const forkLength = canvas.height * (0.12 + Math.random() * 0.18);
-            const branchDirection = (Math.random() - 0.5) * 30;
-            const branch = this.createPath(
-              anchor.x,
-              anchor.y,
-              Math.min(canvas.height + 20, anchor.y + forkLength),
-              canvas.height / 28,
-              70,
-              branchDirection
-            );
-            this.channels.push({
-              points: branch,
-              width: 1.1,
-              glow: 17,
-              alpha: 0.62,
-              jitter: 2,
-            });
-          }
-        }
-      }
-
-      drawChannel(points, width, alpha, blur, jitter, reveal) {
-        if (points.length < 2) return;
-
-        const visiblePoints = Math.max(2, Math.floor(points.length * reveal));
-        ctx.strokeStyle = `rgba(220, 238, 255, ${alpha})`;
-        ctx.lineWidth = width;
-        ctx.shadowBlur = blur;
-        ctx.shadowColor = 'rgba(176, 220, 255, 0.95)';
-        ctx.beginPath();
-
-        const start = points[0];
-        ctx.moveTo(start.x, start.y);
-        for (let i = 1; i < visiblePoints; i++) {
-          const point = points[i];
-          const offsetX = (Math.random() - 0.5) * jitter * this.returnPulse;
-          ctx.lineTo(point.x + offsetX, point.y);
-        }
-        ctx.stroke();
-      }
-
-      update() {
-        this.age += 1;
-        this.intensity = Math.max(0, 1 - (this.age / this.maxAge));
-
-        // Simulate return strokes that briefly boost brightness.
-        if (this.age === 2 || this.age === 5) {
-          this.returnPulse = 1.35;
-        } else {
-          this.returnPulse = Math.max(0.8, this.returnPulse * 0.78);
-        }
-      }
-
-      draw() {
-        if (this.intensity <= 0) return;
-        const flicker = 0.82 + Math.random() * 0.4;
-        const intensity = this.intensity * flicker * this.returnPulse;
-        const reveal = Math.min(1, (this.age + 2) / 6);
-
-        ctx.globalCompositeOperation = 'lighter';
-
-        this.channels.forEach((channel, index) => {
-          const base = channel.alpha * intensity;
-          const widthBoost = index === 0 ? 1 : 0.7;
-          this.drawChannel(channel.points, channel.width * 4.1 * widthBoost, base * 0.13, channel.glow, channel.jitter, reveal);
-          this.drawChannel(channel.points, channel.width * 1.75 * widthBoost, base * 0.44, channel.glow * 0.55, channel.jitter * 0.55, reveal);
-          this.drawChannel(channel.points, channel.width * 0.78, base * 1.12, 3.2, channel.jitter * 0.3, reveal);
-        });
-
-        const trunkEnd = this.channels[0]?.points[this.channels[0].points.length - 1];
-        if (trunkEnd) {
-          const radius = 90 + intensity * 120;
-          const bloom = ctx.createRadialGradient(trunkEnd.x, trunkEnd.y, 0, trunkEnd.x, trunkEnd.y, radius);
-          bloom.addColorStop(0, `rgba(220, 240, 255, ${0.12 * intensity})`);
-          bloom.addColorStop(1, 'rgba(220, 240, 255, 0)');
-          ctx.fillStyle = bloom;
-          ctx.beginPath();
-          ctx.arc(trunkEnd.x, trunkEnd.y, radius, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.shadowBlur = 0;
-      }
-    }
-
     const init = () => {
       particles = Array.from({ length: 120 }, () => new Particle());
     };
@@ -195,15 +59,6 @@ const AnimatedBackground = () => {
       grad.addColorStop(1, '#0a0a0a');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      strikeCooldown -= 1;
-      if (strikeCooldown <= 0 && strikes.length < 2) {
-        strikes.push(new LightningStrike());
-        strikeCooldown = 35 + Math.random() * 180;
-      }
-
-      strikes = strikes.filter((s) => s.intensity > 0);
-      strikes.forEach((s) => { s.update(); s.draw(); });
-
       particles.forEach(p => { p.update(); p.draw(); });
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -382,7 +237,7 @@ export default function App() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-white/5 rounded-2xl mb-6 border border-white/10">
               <Lock size={32} strokeWidth={1.5} />
             </div>
-            <h1 className="text-3xl font-black tracking-tighter uppercase mb-2">QUANTM PORTFOLIO ACCESS</h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase mb-2">QUANTM ACCESS</h1>
             <p className="text-zinc-500 text-[10px] tracking-[0.4em] uppercase font-bold">Authorized Entry Only</p>
           </div>
 
@@ -554,7 +409,7 @@ export default function App() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 px-8 py-6 ${scrolled ? 'bg-black/60 backdrop-blur-2xl border-b border-white/5 py-4' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <button className="text-2xl font-black tracking-tighter cursor-pointer group outline-none" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-            QUANTM PORTFOLIO<span className="text-white/20 group-hover:text-white transition-colors duration-500">.</span>
+            QUANTM<span className="text-white/20 group-hover:text-white transition-colors duration-500">.</span>
           </button>
           
           <div className="flex items-center gap-10">
@@ -580,7 +435,7 @@ export default function App() {
           </div>
           <h1 className="text-[12vw] md:text-9xl font-black mb-10 leading-none select-none px-4">
             <span className="block tracking-tighter mb-2">QUANTM</span>
-            <span className="inline-block tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/10 pr-4">PORTFOLIO</span>
+            <span className="inline-block tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/10 pr-4">STUDIOS</span>
           </h1>
           <div className="flex flex-col sm:flex-row gap-6 justify-center mt-6">
             <button onClick={() => scrollToSection(null, 'pfp')} className="bg-white text-black px-12 py-4 rounded-full font-black text-[11px] tracking-[0.2em] hover:scale-105 transition-transform duration-300 shadow-2xl shadow-white/10">VIEW SHOWREEL</button>
@@ -612,7 +467,7 @@ export default function App() {
       <footer className="border-t border-white/5 py-32 px-8 bg-[#020202] relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col items-center text-center gap-16">
           <div className="space-y-6">
-            <div className="text-6xl font-black tracking-tighter">QUANTM PORTFOLIO<span className="text-white/20">.</span></div>
+            <div className="text-6xl font-black tracking-tighter">QUANTM<span className="text-white/20">.</span></div>
             <p className="text-zinc-600 text-[11px] tracking-[0.5em] uppercase font-black">Visual Excellence Redefined</p>
           </div>
           <div className="flex flex-wrap justify-center gap-12 md:gap-24">
@@ -620,7 +475,7 @@ export default function App() {
             <button onClick={() => setView('login')} className="text-[11px] font-black tracking-[0.3em] text-zinc-800 hover:text-white transition-all duration-300 uppercase relative group">ADMIN ACCESS</button>
           </div>
           <div className="pt-16 border-t border-white/5 w-full flex flex-col md:flex-row justify-between items-center gap-6 text-zinc-700 text-[10px] font-bold tracking-[0.2em] uppercase">
-            <span>© 2026 QUANTM PORTFOLIO</span>
+            <span>© 2026 QUANTM STUDIOS</span>
             <div className="flex gap-10">
               <button type="button" className="hover:text-zinc-400 transition-colors">Privacy</button>
               <button type="button" className="hover:text-zinc-400 transition-colors">Terms</button>
