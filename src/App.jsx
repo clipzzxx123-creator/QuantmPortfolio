@@ -204,13 +204,15 @@ export default function App() {
   const audioRef = useRef(null);
   const [musicTracks, setMusicTracks] = useState(() => {
     const saved = localStorage.getItem('quantm_music_tracks_v1');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, title: 'Late Night Study', url: '', duration: '3:42' },
-      { id: 2, title: 'Rainy Thoughts', url: '', duration: '4:15' },
-      { id: 3, title: 'Coffee & Vibes', url: '', duration: '3:58' },
-      { id: 4, title: 'Moonlit Chill', url: '', duration: '4:30' },
-      { id: 5, title: 'Sunset Reflections', url: '', duration: '3:20' }
-    ];
+    if (!saved) return [];
+
+    try {
+      const parsed = JSON.parse(saved);
+      // Keep only valid tracks that actually have a playable URL.
+      return Array.isArray(parsed) ? parsed.filter((track) => track?.url) : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
@@ -225,9 +227,15 @@ export default function App() {
 
   useEffect(() => {
     if (audioRef.current) {
-      if (isPlaying && musicTracks[currentTrack]?.url) {
-        audioRef.current.src = musicTracks[currentTrack].url;
-        audioRef.current.play();
+      const activeTrack = musicTracks[currentTrack];
+      if (isPlaying && activeTrack?.url) {
+        if (audioRef.current.src !== activeTrack.url) {
+          audioRef.current.src = activeTrack.url;
+          audioRef.current.load();
+        }
+        audioRef.current.play().catch(() => {
+          setIsPlaying(false);
+        });
       } else {
         audioRef.current.pause();
       }
@@ -241,7 +249,11 @@ export default function App() {
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => {
-      setCurrentTrack((prev) => (prev + 1) % musicTracks.length);
+      if (musicTracks.length > 0) {
+        setCurrentTrack((prev) => (prev + 1) % musicTracks.length);
+      } else {
+        setIsPlaying(false);
+      }
     };
 
     audio.addEventListener('timeupdate', updateTime);
@@ -254,6 +266,20 @@ export default function App() {
       audio.removeEventListener('ended', handleEnded);
     };
   }, [musicTracks]);
+
+  useEffect(() => {
+    if (musicTracks.length === 0) {
+      setCurrentTrack(0);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
+
+    if (currentTrack >= musicTracks.length) {
+      setCurrentTrack(musicTracks.length - 1);
+    }
+  }, [musicTracks, currentTrack]);
   
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -329,10 +355,17 @@ export default function App() {
   };
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    if (musicTracks.length === 0) return;
+
+    const activeTrack = musicTracks[currentTrack];
+    if (!activeTrack?.url) return;
+
+    setIsPlaying((prev) => !prev);
   };
 
   const handleTrackChange = (direction) => {
+    if (musicTracks.length === 0) return;
+
     setCurrentTrack((prev) => {
       const newTrack = prev + direction;
       if (newTrack < 0) return musicTracks.length - 1;
@@ -361,11 +394,11 @@ export default function App() {
   };
 
   const handleUpdateSong = (id, field, value) => {
-    setMusicTracks(musicTracks.map(song => song.id === id ? { ...song, [field]: value } : song));
+    setMusicTracks((prev) => prev.map(song => song.id === id ? { ...song, [field]: value } : song));
   };
 
   const handleRemoveSong = (id) => {
-    setMusicTracks(musicTracks.filter(song => song.id !== id));
+    setMusicTracks((prev) => prev.filter(song => song.id !== id));
   };
 
   const handleMusicUpload = (id, e) => {
@@ -373,8 +406,14 @@ export default function App() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        handleUpdateSong(id, 'url', reader.result);
-        handleUpdateSong(id, 'title', file.name.replace(/\.[^/.]+$/, ''));
+        setMusicTracks((prev) => prev.map((song) => {
+          if (song.id !== id) return song;
+          return {
+            ...song,
+            url: reader.result,
+            title: file.name.replace(/\.[^/.]+$/, '')
+          };
+        }));
       };
       reader.readAsDataURL(file);
     }
