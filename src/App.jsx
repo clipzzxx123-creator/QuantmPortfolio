@@ -18,7 +18,8 @@ const AnimatedBackground = () => {
     const ctx = canvas.getContext('2d', { alpha: false });
     let animationFrameId;
     let particles = [];
-    let bolts = [];
+    let strikes = [];
+    let strikeCooldown = 40 + Math.random() * 140;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -50,59 +51,134 @@ const AnimatedBackground = () => {
       }
     }
 
-    class Bolt {
+    class LightningStrike {
       constructor() {
-        this.path = [];
-        this.segments = 20;
-        this.x = Math.random() * canvas.width;
-        this.y = 0;
-        this.life = 1;
-        this.generatePath();
+        this.channels = [];
+        this.age = 0;
+        this.maxAge = 20 + Math.random() * 12;
+        this.strikeX = canvas.width * (0.1 + Math.random() * 0.8);
+        this.endY = canvas.height * (0.62 + Math.random() * 0.34);
+        this.returnPulse = 1;
+        this.intensity = 1;
+        this.build();
       }
-      generatePath() {
-        let curX = this.x;
-        let curY = this.y;
-        this.path.push({x: curX, y: curY});
-        for (let i = 0; i < this.segments; i++) {
-          curX += (Math.random() - 0.5) * 60;
-          curY += (canvas.height / this.segments);
-          this.path.push({x: curX, y: curY});
-          if (Math.random() > 0.95) {
-            this.path.push("branch");
-            this.path.push({x: curX + (Math.random() - 0.5) * 40, y: curY + 20});
+
+      createPath(startX, startY, endY, stepY, spread, directionBias = 0) {
+        const points = [{ x: startX, y: startY }];
+        let curX = startX;
+        let curY = startY;
+
+        while (curY < endY) {
+          const jitter = (Math.random() - 0.5) * spread + directionBias;
+          curX += jitter;
+          curY += stepY * (0.75 + Math.random() * 0.6);
+          curX = Math.max(-80, Math.min(canvas.width + 80, curX));
+          points.push({ x: curX, y: curY });
+          if (points.length > 36) break;
+        }
+
+        return points;
+      }
+
+      build() {
+        const trunk = this.createPath(
+          this.strikeX,
+          -20,
+          this.endY,
+          canvas.height / 18,
+          80
+        );
+        this.channels.push({
+          points: trunk,
+          width: 2.3,
+          glow: 30,
+          alpha: 1.15,
+          jitter: 2.8,
+        });
+
+        for (let i = 2; i < trunk.length - 2; i++) {
+          if (Math.random() < 0.34 && this.channels.length < 6) {
+            const anchor = trunk[i];
+            const forkLength = canvas.height * (0.12 + Math.random() * 0.18);
+            const branchDirection = (Math.random() - 0.5) * 30;
+            const branch = this.createPath(
+              anchor.x,
+              anchor.y,
+              Math.min(canvas.height + 20, anchor.y + forkLength),
+              canvas.height / 28,
+              70,
+              branchDirection
+            );
+            this.channels.push({
+              points: branch,
+              width: 1.1,
+              glow: 17,
+              alpha: 0.62,
+              jitter: 2,
+            });
           }
         }
       }
-      update() { this.life -= 0.03; }
 
-      tracePath() {
+      drawChannel(points, width, alpha, blur, jitter, reveal) {
+        if (points.length < 2) return;
+
+        const visiblePoints = Math.max(2, Math.floor(points.length * reveal));
+        ctx.strokeStyle = `rgba(220, 238, 255, ${alpha})`;
+        ctx.lineWidth = width;
+        ctx.shadowBlur = blur;
+        ctx.shadowColor = 'rgba(176, 220, 255, 0.95)';
         ctx.beginPath();
-        ctx.moveTo(this.path[0].x, this.path[0].y);
-        for (let i = 1; i < this.path.length; i++) {
-          if (this.path[i] === "branch") {
-             ctx.stroke(); ctx.beginPath(); ctx.moveTo(this.path[i-1].x, this.path[i-1].y);
-             i++; if (this.path[i]) ctx.lineTo(this.path[i].x, this.path[i].y);
-          } else { ctx.lineTo(this.path[i].x, this.path[i].y); }
+
+        const start = points[0];
+        ctx.moveTo(start.x, start.y);
+        for (let i = 1; i < visiblePoints; i++) {
+          const point = points[i];
+          const offsetX = (Math.random() - 0.5) * jitter * this.returnPulse;
+          ctx.lineTo(point.x + offsetX, point.y);
         }
         ctx.stroke();
       }
 
+      update() {
+        this.age += 1;
+        this.intensity = Math.max(0, 1 - (this.age / this.maxAge));
+
+        // Simulate return strokes that briefly boost brightness.
+        if (this.age === 2 || this.age === 5) {
+          this.returnPulse = 1.35;
+        } else {
+          this.returnPulse = Math.max(0.8, this.returnPulse * 0.78);
+        }
+      }
+
       draw() {
-        if (this.life <= 0) return;
+        if (this.intensity <= 0) return;
+        const flicker = 0.82 + Math.random() * 0.4;
+        const intensity = this.intensity * flicker * this.returnPulse;
+        const reveal = Math.min(1, (this.age + 2) / 6);
 
-        // Localized halo: adds slight glow around each bolt segment only.
         ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = `rgba(176, 220, 255, ${this.life * 0.06})`;
-        ctx.lineWidth = 8;
-        ctx.shadowBlur = 16;
-        ctx.shadowColor = "rgba(160, 215, 255, 0.9)";
-        this.tracePath();
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${this.life * 0.18})`;
-        ctx.lineWidth = 1.1;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = "white";
-        this.tracePath();
+        this.channels.forEach((channel, index) => {
+          const base = channel.alpha * intensity;
+          const widthBoost = index === 0 ? 1 : 0.7;
+          this.drawChannel(channel.points, channel.width * 4.1 * widthBoost, base * 0.13, channel.glow, channel.jitter, reveal);
+          this.drawChannel(channel.points, channel.width * 1.75 * widthBoost, base * 0.44, channel.glow * 0.55, channel.jitter * 0.55, reveal);
+          this.drawChannel(channel.points, channel.width * 0.78, base * 1.12, 3.2, channel.jitter * 0.3, reveal);
+        });
+
+        const trunkEnd = this.channels[0]?.points[this.channels[0].points.length - 1];
+        if (trunkEnd) {
+          const radius = 90 + intensity * 120;
+          const bloom = ctx.createRadialGradient(trunkEnd.x, trunkEnd.y, 0, trunkEnd.x, trunkEnd.y, radius);
+          bloom.addColorStop(0, `rgba(220, 240, 255, ${0.12 * intensity})`);
+          bloom.addColorStop(1, 'rgba(220, 240, 255, 0)');
+          ctx.fillStyle = bloom;
+          ctx.beginPath();
+          ctx.arc(trunkEnd.x, trunkEnd.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.shadowBlur = 0;
@@ -119,9 +195,15 @@ const AnimatedBackground = () => {
       grad.addColorStop(1, '#0a0a0a');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (Math.random() > 0.996 && bolts.length < 2) bolts.push(new Bolt());
-      bolts = bolts.filter(b => b.life > 0);
-      bolts.forEach(b => { b.update(); b.draw(); });
+      strikeCooldown -= 1;
+      if (strikeCooldown <= 0 && strikes.length < 2) {
+        strikes.push(new LightningStrike());
+        strikeCooldown = 35 + Math.random() * 180;
+      }
+
+      strikes = strikes.filter((s) => s.intensity > 0);
+      strikes.forEach((s) => { s.update(); s.draw(); });
+
       particles.forEach(p => { p.update(); p.draw(); });
       animationFrameId = requestAnimationFrame(animate);
     };
