@@ -19,6 +19,7 @@ const AnimatedBackground = () => {
     let animationFrameId;
     let particles = [];
     let bolts = [];
+    let ambientFlash = 0;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -53,42 +54,89 @@ const AnimatedBackground = () => {
     class Bolt {
       constructor() {
         this.path = [];
-        this.segments = 20;
+        this.branches = [];
+        this.segments = Math.floor(14 + Math.random() * 10);
         this.x = Math.random() * canvas.width;
         this.y = 0;
         this.life = 1;
+        this.decay = 0.035 + Math.random() * 0.02;
         this.generatePath();
       }
+
+      createPath(startX, startY, segments, stepY, spread, directionBias = 0) {
+        const points = [{ x: startX, y: startY }];
+        let curX = startX;
+        let curY = startY;
+
+        for (let i = 0; i < segments; i++) {
+          const jitter = (Math.random() - 0.5) * spread + directionBias;
+          curX += jitter;
+          curY += stepY * (0.75 + Math.random() * 0.6);
+          curX = Math.max(-80, Math.min(canvas.width + 80, curX));
+          points.push({ x: curX, y: curY });
+          if (curY >= canvas.height + 20) break;
+        }
+
+        return points;
+      }
+
       generatePath() {
-        let curX = this.x;
-        let curY = this.y;
-        this.path.push({x: curX, y: curY});
-        for (let i = 0; i < this.segments; i++) {
-          curX += (Math.random() - 0.5) * 60;
-          curY += (canvas.height / this.segments);
-          this.path.push({x: curX, y: curY});
-          if (Math.random() > 0.95) {
-            this.path.push("branch");
-            this.path.push({x: curX + (Math.random() - 0.5) * 40, y: curY + 20});
+        const stepY = canvas.height / this.segments;
+        this.path = this.createPath(this.x, this.y, this.segments, stepY, 70);
+
+        for (let i = 2; i < this.path.length - 2; i++) {
+          if (Math.random() < 0.28 && this.branches.length < 4) {
+            const anchor = this.path[i];
+            const branchSegments = Math.floor(4 + Math.random() * 5);
+            const branchDirection = (Math.random() - 0.5) * 16;
+            const branch = this.createPath(
+              anchor.x,
+              anchor.y,
+              branchSegments,
+              stepY * 0.65,
+              55,
+              branchDirection
+            );
+            this.branches.push(branch);
           }
         }
       }
-      update() { this.life -= 0.03; }
+
+      drawPath(points, width, alpha, blur) {
+        if (points.length < 2) return;
+        ctx.strokeStyle = `rgba(220, 238, 255, ${alpha})`;
+        ctx.lineWidth = width;
+        ctx.shadowBlur = blur;
+        ctx.shadowColor = 'rgba(176, 220, 255, 0.95)';
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.stroke();
+      }
+
+      update() { this.life -= this.decay; }
+
       draw() {
         if (this.life <= 0) return;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${this.life * 0.15})`;
-        ctx.lineWidth = 1;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = "white";
-        ctx.beginPath();
-        ctx.moveTo(this.path[0].x, this.path[0].y);
-        for (let i = 1; i < this.path.length; i++) {
-          if (this.path[i] === "branch") {
-             ctx.stroke(); ctx.beginPath(); ctx.moveTo(this.path[i-1].x, this.path[i-1].y);
-             i++; if (this.path[i]) ctx.lineTo(this.path[i].x, this.path[i].y);
-          } else { ctx.lineTo(this.path[i].x, this.path[i].y); }
-        }
-        ctx.stroke(); ctx.shadowBlur = 0;
+        const flicker = 0.75 + Math.random() * 0.5;
+        const intensity = this.life * flicker;
+
+        ctx.globalCompositeOperation = 'lighter';
+
+        this.drawPath(this.path, 7, intensity * 0.08, 28);
+        this.drawPath(this.path, 2.2, intensity * 0.3, 10);
+        this.drawPath(this.path, 1.1, intensity * 0.95, 2.5);
+
+        this.branches.forEach((branch) => {
+          this.drawPath(branch, 3.5, intensity * 0.06, 18);
+          this.drawPath(branch, 1.2, intensity * 0.26, 6);
+          this.drawPath(branch, 0.8, intensity * 0.75, 1.5);
+        });
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = 0;
       }
     }
 
@@ -102,9 +150,21 @@ const AnimatedBackground = () => {
       grad.addColorStop(1, '#0a0a0a');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (Math.random() > 0.996 && bolts.length < 2) bolts.push(new Bolt());
+      if (Math.random() > 0.996 && bolts.length < 2) {
+        bolts.push(new Bolt());
+        ambientFlash = Math.max(ambientFlash, 0.55 + Math.random() * 0.35);
+      }
+
       bolts = bolts.filter(b => b.life > 0);
       bolts.forEach(b => { b.update(); b.draw(); });
+
+      const boltEnergy = bolts.reduce((max, bolt) => Math.max(max, bolt.life), 0);
+      ambientFlash = Math.max(ambientFlash * 0.88, boltEnergy * 0.55);
+      if (ambientFlash > 0.01) {
+        ctx.fillStyle = `rgba(190, 225, 255, ${ambientFlash * 0.18})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
       particles.forEach(p => { p.update(); p.draw(); });
       animationFrameId = requestAnimationFrame(animate);
     };
