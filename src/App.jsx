@@ -72,90 +72,31 @@ const AnimatedBackground = () => {
 };
 
 // --- Music Playlist Component ---
-const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackChange }) => (
-  <div className="w-full max-w-2xl mx-auto mt-12 bg-white/[0.03] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-    <div className="flex items-center gap-3 mb-6">
-      <Music size={20} className="text-white/60" />
-      <span className="text-[10px] font-black tracking-[0.3em] uppercase text-white/40">Quantm Soundtrack</span>
-    </div>
+const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackChange, audioRef }) => (
+  <div className="flex items-center justify-center gap-6 mt-12">
+    <audio ref={audioRef} />
+    <button
+      onClick={() => onTrackChange(-1)}
+      className="text-white/60 hover:text-white transition-colors"
+    >
+      <SkipBack size={24} />
+    </button>
     
-    <div className="space-y-4">
-      {/* Current Track Display */}
-      <div className="bg-black/40 rounded-lg p-4 border border-white/5">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-white font-bold text-sm truncate">{tracks[currentTrack].title}</p>
-            <p className="text-white/40 text-xs truncate">{tracks[currentTrack].artist}</p>
-          </div>
-          <span className="text-[10px] text-white/40 font-bold whitespace-nowrap">{tracks[currentTrack].duration}</span>
-        </div>
-        
-        {/* Progress Bar */}
-        <div className="w-full h-1 bg-white/10 rounded-full">
-          <div className="h-full w-1/3 bg-white rounded-full"></div>
-        </div>
-      </div>
-      
-      {/* Player Controls */}
-      <div className="flex items-center justify-center gap-4">
-        <button
-          onClick={() => onTrackChange(-1)}
-          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white"
-        >
-          <SkipBack size={18} />
-        </button>
-        
-        <button
-          onClick={onPlayPause}
-          className="p-3 rounded-lg bg-white text-black hover:bg-zinc-200 transition-all font-black"
-        >
-          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-        </button>
-        
-        <button
-          onClick={() => onTrackChange(1)}
-          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white"
-        >
-          <SkipForward size={18} />
-        </button>
-        
-        <div className="ml-auto flex items-center gap-2">
-          <Volume2 size={16} className="text-white/40" />
-          <input
-            type="range"
-            min="0"
-            max="100"
-            defaultValue="60"
-            className="w-20 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white"
-          />
-        </div>
-      </div>
-      
-      {/* Playlist */}
-      <div className="space-y-2 mt-6 border-t border-white/5 pt-4">
-        <p className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30 mb-3">Up Next</p>
-        <div className="space-y-2 max-h-32 overflow-y-auto">
-          {tracks.map((track, idx) => (
-            <button
-              key={idx}
-              onClick={() => onTrackChange(idx - currentTrack)}
-              className={`w-full text-left p-2 rounded-lg transition-all ${
-                idx === currentTrack
-                  ? 'bg-white/10 border border-white/20'
-                  : 'hover:bg-white/5 border border-transparent'
-              }`}
-            >
-              <p className={`text-xs font-bold truncate ${
-                idx === currentTrack ? 'text-white' : 'text-white/60 group-hover:text-white'
-              }`}>
-                {idx + 1}. {track.title}
-              </p>
-              <p className="text-[10px] text-white/30 truncate">{track.artist}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+    <button
+      onClick={onPlayPause}
+      className="bg-white text-black p-3 rounded-full hover:bg-zinc-200 transition-all font-black"
+    >
+      {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+    </button>
+    
+    <button
+      onClick={() => onTrackChange(1)}
+      className="text-white/60 hover:text-white transition-colors"
+    >
+      <SkipForward size={24} />
+    </button>
+    
+    <p className="text-white font-bold text-sm truncate max-w-xs">{tracks[currentTrack]?.title || 'No tracks'}</p>
   </div>
 );
 
@@ -210,13 +151,32 @@ export default function App() {
   // Music Player State
   const [currentTrack, setCurrentTrack] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const musicTracks = [
-    { title: 'Late Night Study', artist: 'QUANTM Lofi', duration: '3:42' },
-    { title: 'Rainy Thoughts', artist: 'QUANTM Lofi', duration: '4:15' },
-    { title: 'Coffee & Vibes', artist: 'QUANTM Lofi', duration: '3:58' },
-    { title: 'Moonlit Chill', artist: 'QUANTM Lofi', duration: '4:30' },
-    { title: 'Sunset Reflections', artist: 'QUANTM Lofi', duration: '3:20' }
-  ];
+  const audioRef = useRef(null);
+  const [musicTracks, setMusicTracks] = useState(() => {
+    const saved = localStorage.getItem('quantm_music_tracks_v1');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, title: 'Late Night Study', url: '', duration: '3:42' },
+      { id: 2, title: 'Rainy Thoughts', url: '', duration: '4:15' },
+      { id: 3, title: 'Coffee & Vibes', url: '', duration: '3:58' },
+      { id: 4, title: 'Moonlit Chill', url: '', duration: '4:30' },
+      { id: 5, title: 'Sunset Reflections', url: '', duration: '3:20' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('quantm_music_tracks_v1', JSON.stringify(musicTracks));
+  }, [musicTracks]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying && musicTracks[currentTrack]?.url) {
+        audioRef.current.src = musicTracks[currentTrack].url;
+        audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [currentTrack, isPlaying, musicTracks]);
   
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -317,6 +277,31 @@ export default function App() {
 
   // --- Admin Logic ---
   const [adminTab, setAdminTab] = useState('pfp');
+
+  const handleAddSong = () => {
+    const newSong = { id: Date.now(), title: 'New Song', url: '', duration: '0:00' };
+    setMusicTracks([...musicTracks, newSong]);
+  };
+
+  const handleUpdateSong = (id, field, value) => {
+    setMusicTracks(musicTracks.map(song => song.id === id ? { ...song, [field]: value } : song));
+  };
+
+  const handleRemoveSong = (id) => {
+    setMusicTracks(musicTracks.filter(song => song.id !== id));
+  };
+
+  const handleMusicUpload = (id, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleUpdateSong(id, 'url', reader.result);
+        handleUpdateSong(id, 'title', file.name.replace(/\.[^/.]+$/, ''));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleOpenConcept = (section, item) => {
     setSelectedConcept({ section, item });
@@ -450,10 +435,50 @@ export default function App() {
                 {s.title}
               </button>
             ))}
+            <button onClick={() => setAdminTab('music')} className={`min-w-[120px] flex-1 py-4 rounded-xl font-black text-[10px] tracking-[0.3em] uppercase transition-all border ${adminTab === 'music' ? 'bg-white text-black border-white' : 'bg-white/5 text-zinc-500 border-white/5 hover:border-white/20'}`}>
+              MUSIC
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-8">
-            {projects[adminTab].map((p) => (
+            {adminTab === 'music' ? (
+              <>
+                {musicTracks.map((song) => (
+                  <div key={song.id} className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col gap-6 items-start">
+                    <div className="w-full flex gap-8 items-start">
+                      <div className="flex-1 space-y-6">
+                        <div className="flex gap-4">
+                          <div className="flex-1">
+                            <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase block mb-2">Song Title</label>
+                            <input value={song.title} onChange={(e) => handleUpdateSong(song.id, 'title', e.target.value)} className="bg-black/50 border border-white/10 rounded-lg px-4 py-3 w-full font-bold text-white outline-none focus:border-white/30 transition-all" />
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase block mb-2">Duration</label>
+                            <input value={song.duration} onChange={(e) => handleUpdateSong(song.id, 'duration', e.target.value)} className="bg-black/50 border border-white/10 rounded-lg px-4 py-3 w-full font-bold text-white outline-none focus:border-white/30 transition-all" placeholder="0:00" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase block mb-2">Upload MP3</label>
+                          <div className="flex items-center gap-3">
+                            <label className="flex-1 cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-4 py-3 text-white font-bold text-[10px] tracking-wider uppercase transition-all text-center">
+                              CHOOSE FILE
+                              <input type="file" className="hidden" accept="audio/mp3,.mp3" onChange={(e) => handleMusicUpload(song.id, e)} />
+                            </label>
+                            <span className="text-xs text-white/40">{song.url ? '✓ Loaded' : 'No file'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => handleRemoveSong(song.id)} className="mt-2 p-3 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20} /></button>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={handleAddSong} className="w-full py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-zinc-700 hover:text-white hover:border-white/20 transition-all group">
+                  <Plus size={40} className="group-hover:scale-110 transition-transform" />
+                  <span className="font-black text-[10px] tracking-[0.5em] uppercase">Add Song</span>
+                </button>
+              </>
+            ) : (
+              projects[adminTab].map((p) => (
               <div key={p.id} className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col gap-8 items-start group">
                 <div className="flex flex-col lg:flex-row w-full gap-10">
                   <div className={`w-full lg:w-80 ${adminTab === 'banners' ? 'aspect-[16/5]' : 'aspect-square'} rounded-xl bg-black border border-white/5 overflow-hidden flex-shrink-0 relative group flex items-center justify-center`}>
@@ -507,10 +532,12 @@ export default function App() {
               </div>
             ))}
 
-            <button onClick={() => handleAddProject(adminTab)} className="w-full py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-zinc-700 hover:text-white hover:border-white/20 transition-all group">
-              <Plus size={40} className="group-hover:scale-110 transition-transform" />
-              <span className="font-black text-[10px] tracking-[0.5em] uppercase">Create {adminTab} Slot</span>
-            </button>
+              <button onClick={() => handleAddProject(adminTab)} className="w-full py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-zinc-700 hover:text-white hover:border-white/20 transition-all group">
+                <Plus size={40} className="group-hover:scale-110 transition-transform" />
+                <span className="font-black text-[10px] tracking-[0.5em] uppercase">Create {adminTab} Slot</span>
+              </button>
+            )}
+            </div>
           </div>
         </div>
       </div>
@@ -650,6 +677,7 @@ export default function App() {
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
             onTrackChange={handleTrackChange}
+            audioRef={audioRef}
           />
           <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
             <button onClick={() => scrollToSection(null, 'pfp')} className="bg-white text-black px-12 py-4 rounded-full font-black text-[11px] tracking-[0.2em] hover:scale-105 transition-transform duration-300 shadow-2xl shadow-white/10">VIEW SHOWREEL</button>
