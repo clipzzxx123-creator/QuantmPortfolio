@@ -80,8 +80,6 @@ const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackCh
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
-
   return (
     <div className="w-full max-w-2xl mx-auto mt-12">
       <audio ref={audioRef} crossOrigin="anonymous" />
