@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle, Play, Pause, SkipBack, SkipForward, Volume2, Music } from 'lucide-react';
+import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
 // --- Custom Discord Icon ---
 const DiscordIcon = ({ size = 20, className = "" }) => (
