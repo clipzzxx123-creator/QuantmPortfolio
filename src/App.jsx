@@ -74,12 +74,8 @@ const AnimatedBackground = () => {
         }
       }
       update() { this.life -= 0.03; }
-      draw() {
-        if (this.life <= 0) return;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${this.life * 0.15})`;
-        ctx.lineWidth = 1;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = "white";
+
+      tracePath() {
         ctx.beginPath();
         ctx.moveTo(this.path[0].x, this.path[0].y);
         for (let i = 1; i < this.path.length; i++) {
@@ -88,7 +84,28 @@ const AnimatedBackground = () => {
              i++; if (this.path[i]) ctx.lineTo(this.path[i].x, this.path[i].y);
           } else { ctx.lineTo(this.path[i].x, this.path[i].y); }
         }
-        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.stroke();
+      }
+
+      draw() {
+        if (this.life <= 0) return;
+
+        // Localized halo: adds slight glow around each bolt segment only.
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(176, 220, 255, ${this.life * 0.06})`;
+        ctx.lineWidth = 8;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = "rgba(160, 215, 255, 0.9)";
+        this.tracePath();
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${this.life * 0.18})`;
+        ctx.lineWidth = 1.1;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "white";
+        this.tracePath();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = 0;
       }
     }
 
