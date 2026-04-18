@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Settings, Eye, LogIn, Save, X, Move, Maximize, Lock, User, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle } from 'lucide-react';
 
 // --- Custom Discord Icon ---
 const DiscordIcon = ({ size = 20, className = "" }) => (
@@ -180,12 +180,12 @@ export default function App() {
     localStorage.setItem('quantm_projects_v5', JSON.stringify(projects));
   }, [projects]);
 
-  const sections = [
+  const sections = useMemo(() => [
     { id: 'pfp', title: 'PFP', icon: <Camera size={18} />, description: 'High-impact profile identifiers.' },
     { id: 'banners', title: 'BANNERS', icon: <Palette size={18} />, description: 'Cinematic headers & landscape branding.' },
     { id: 'vfx', title: 'VFX', icon: <Film size={18} />, description: 'Motion-driven visual storytelling.' },
     { id: 'gfx', title: 'GFX', icon: <ImageIcon size={18} />, description: 'Premium static brand assets.' }
-  ];
+  ], []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -220,7 +220,7 @@ export default function App() {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('mousemove', handleMouseMove);
     };
-  }, []);
+  }, [sections]);
 
   const scrollToSection = (e, id) => {
     if (e) e.preventDefault();
@@ -378,7 +378,7 @@ export default function App() {
                 <div className="flex flex-col lg:flex-row w-full gap-10">
                   <div className={`w-full lg:w-80 ${adminTab === 'banners' ? 'aspect-[16/5]' : 'aspect-square'} rounded-xl bg-black border border-white/5 overflow-hidden flex-shrink-0 relative group flex items-center justify-center`}>
                     {p.image ? (
-                      <img src={p.image} className="max-w-none" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${p.scale}) translate(${p.offsetX}%, ${p.offsetY}%)` }} />
+                      <img src={p.image} alt={p.title || 'Project preview'} className="max-w-none" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${p.scale}) translate(${p.offsetX}%, ${p.offsetY}%)` }} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-zinc-800"><ImageIcon size={32} /></div>
                     )}
@@ -523,8 +523,8 @@ export default function App() {
           <div className="pt-16 border-t border-white/5 w-full flex flex-col md:flex-row justify-between items-center gap-6 text-zinc-700 text-[10px] font-bold tracking-[0.2em] uppercase">
             <span>© 2026 QUANTM STUDIOS</span>
             <div className="flex gap-10">
-              <a href="#" className="hover:text-zinc-400 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-zinc-400 transition-colors">Terms</a>
+              <button type="button" className="hover:text-zinc-400 transition-colors">Privacy</button>
+              <button type="button" className="hover:text-zinc-400 transition-colors">Terms</button>
             </div>
           </div>
         </div>
