@@ -72,8 +72,12 @@ const AnimatedBackground = () => {
 };
 
 // --- Portfolio Grid Item ---
-const PortfolioItem = ({ item, categoryId }) => (
-  <div className={`group relative ${categoryId === 'banners' ? 'aspect-[16/5] sm:col-span-2 lg:col-span-3' : 'aspect-square'} bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden cursor-pointer transform-gpu transition-all duration-500 ease-out hover:border-white/40 hover:scale-[1.01] hover:shadow-2xl hover:shadow-white/5`}>
+const PortfolioItem = ({ item, categoryId, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group relative w-full text-left ${categoryId === 'banners' ? 'aspect-[16/5] sm:col-span-2 lg:col-span-3' : 'aspect-square'} bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden cursor-pointer transform-gpu transition-all duration-500 ease-out hover:border-white/40 hover:scale-[1.01] hover:shadow-2xl hover:shadow-white/5`}
+  >
     {item.image ? (
       <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden">
         <img 
@@ -102,14 +106,15 @@ const PortfolioItem = ({ item, categoryId }) => (
         <p className="text-white/40 text-[10px] uppercase tracking-[0.3em] font-bold mt-2">View Production</p>
       </div>
     </div>
-  </div>
+  </button>
 );
 
 export default function App() {
-  // --- PASTE YOUR DISCORD INVITE LINK BELOW ---
-  const DISCORD_LINK = "https://discord.gg/nXthZ5qywN"; 
+  // --- PASTE YOUR DISCORD PROFILE LINK BELOW ---
+  const DISCORD_LINK = "https://discord.com/users/1445526330912276623"; 
 
   const [view, setView] = useState('portfolio'); // 'portfolio', 'login', 'admin'
+  const [selectedConcept, setSelectedConcept] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeSection, setActiveSection] = useState('hero');
@@ -200,6 +205,15 @@ export default function App() {
 
   // --- Admin Logic ---
   const [adminTab, setAdminTab] = useState('pfp');
+
+  const handleOpenConcept = (section, item) => {
+    setSelectedConcept({ section, item });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseConcept = () => {
+    setSelectedConcept(null);
+  };
   
   const handleAddProject = (category) => {
     const newProj = { id: Date.now(), title: 'New Concept', image: '', scale: 1, offsetX: 0, offsetY: 0 };
@@ -391,6 +405,87 @@ export default function App() {
     );
   }
 
+  if (selectedConcept) {
+    const { section, item } = selectedConcept;
+
+    return (
+      <div className="min-h-screen text-white font-sans selection:bg-white selection:text-black bg-black antialiased overflow-x-hidden">
+        <AnimatedBackground />
+
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-black/70 backdrop-blur-2xl border-b border-white/10 px-8 py-4">
+          <div className="max-w-7xl mx-auto flex justify-between items-center gap-6">
+            <button
+              type="button"
+              onClick={handleCloseConcept}
+              className="text-[11px] font-black tracking-[0.25em] uppercase text-white/70 hover:text-white transition-colors"
+            >
+              Back to Concepts
+            </button>
+
+            <a
+              href={DISCORD_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-3 bg-white text-black px-6 py-2.5 rounded-full font-black text-[11px] hover:bg-zinc-200 transition-all duration-300 active:scale-95 shadow-xl shadow-white/5"
+            >
+              <DiscordIcon size={16} />
+              <span className="tracking-[0.1em]">HIRE QUANTM</span>
+            </a>
+          </div>
+        </nav>
+
+        <main className="max-w-7xl mx-auto px-8 pt-32 pb-20 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
+            <div className="bg-white/[0.03] border border-white/10 rounded-3xl overflow-hidden min-h-[340px] lg:min-h-[540px] flex items-center justify-center p-6 lg:p-10">
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="w-full h-full object-contain"
+                  style={{
+                    transform: `scale(${item.scale || 1}) translate(${item.offsetX || 0}%, ${item.offsetY || 0}%)`
+                  }}
+                />
+              ) : (
+                <div className="text-white/10 flex flex-col items-center gap-4">
+                  <ImageIcon size={72} strokeWidth={0.75} />
+                  <p className="text-xs uppercase tracking-[0.25em] font-black text-white/40">No image uploaded yet</p>
+                </div>
+              )}
+            </div>
+
+            <aside className="bg-white/[0.03] border border-white/10 rounded-3xl p-8 lg:p-10">
+              <p className="text-[10px] font-black tracking-[0.35em] uppercase text-white/40 mb-4">{section.title} Concept</p>
+              <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-tight mb-4">{item.title}</h1>
+              <p className="text-zinc-400 leading-relaxed text-sm sm:text-base">
+                Explore this concept in focus view to see composition, placement, and finishing details with zero grid distractions.
+              </p>
+
+              <div className="mt-10 space-y-4">
+                <a
+                  href={DISCORD_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-3 bg-white text-black px-6 py-4 rounded-full font-black text-[11px] tracking-[0.2em] uppercase hover:bg-zinc-200 transition-all duration-300"
+                >
+                  <DiscordIcon size={16} />
+                  Hire Quantm
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCloseConcept}
+                  className="w-full border border-white/20 text-white px-6 py-4 rounded-full font-black text-[11px] tracking-[0.2em] uppercase hover:bg-white/10 transition-all duration-300"
+                >
+                  Back to Gallery
+                </button>
+              </div>
+            </aside>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-white font-sans selection:bg-white selection:text-black bg-black antialiased overflow-x-hidden scroll-smooth">
       <AnimatedBackground />
@@ -457,7 +552,12 @@ export default function App() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
               {projects[section.id].map((item) => (
-                <PortfolioItem key={item.id} item={item} categoryId={section.id} />
+                <PortfolioItem
+                  key={item.id}
+                  item={item}
+                  categoryId={section.id}
+                  onClick={() => handleOpenConcept(section, item)}
+                />
               ))}
             </div>
           </section>
