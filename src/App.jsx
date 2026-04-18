@@ -478,66 +478,66 @@ export default function App() {
                 </button>
               </>
             ) : (
-              projects[adminTab].map((p) => (
-              <div key={p.id} className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col gap-8 items-start group">
-                <div className="flex flex-col lg:flex-row w-full gap-10">
-                  <div className={`w-full lg:w-80 ${adminTab === 'banners' ? 'aspect-[16/5]' : 'aspect-square'} rounded-xl bg-black border border-white/5 overflow-hidden flex-shrink-0 relative group flex items-center justify-center`}>
-                    {p.image ? (
-                      <img src={p.image} alt={p.title || 'Project preview'} className="max-w-none" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${p.scale}) translate(${p.offsetX}%, ${p.offsetY}%)` }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-800"><ImageIcon size={32} /></div>
-                    )}
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <label className="cursor-pointer text-white font-black text-[10px] tracking-widest uppercase">
-                        IMPORT IMAGE
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(adminTab, p.id, e)} />
-                      </label>
+              <>
+                {projects[adminTab].map((p) => (
+                  <div key={p.id} className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col gap-8 items-start group">
+                    <div className="flex flex-col lg:flex-row w-full gap-10">
+                      <div className={`w-full lg:w-80 ${adminTab === 'banners' ? 'aspect-[16/5]' : 'aspect-square'} rounded-xl bg-black border border-white/5 overflow-hidden flex-shrink-0 relative group flex items-center justify-center`}>
+                        {p.image ? (
+                          <img src={p.image} alt={p.title || 'Project preview'} className="max-w-none" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${p.scale}) translate(${p.offsetX}%, ${p.offsetY}%)` }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-800"><ImageIcon size={32} /></div>
+                        )}
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <label className="cursor-pointer text-white font-black text-[10px] tracking-widest uppercase">
+                            IMPORT IMAGE
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(adminTab, p.id, e)} />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-8">
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1 mr-4">
+                            <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase block mb-2">Project Label</label>
+                            <input value={p.title} onChange={(e) => handleUpdateProject(adminTab, p.id, 'title', e.target.value)} className="bg-black/50 border border-white/10 rounded-lg px-4 py-3 w-full font-bold text-white outline-none focus:border-white/30 transition-all" />
+                          </div>
+                          <button onClick={() => handleRemoveProject(adminTab, p.id)} className="mt-6 p-3 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20} /></button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Fit (Scale)</label>
+                              <span className="text-white text-[10px] font-bold">{p.scale}x</span>
+                            </div>
+                            <input type="range" min="0.1" max="5" style={{width: '100%'}} step="0.05" value={p.scale} onChange={(e) => handleUpdateProject(adminTab, p.id, 'scale', parseFloat(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
+                          </div>
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Center X</label>
+                              <span className="text-white text-[10px] font-bold">{p.offsetX}%</span>
+                            </div>
+                            <input type="range" min="-150" max="150" style={{width: '100%'}} step="1" value={p.offsetX} onChange={(e) => handleUpdateProject(adminTab, p.id, 'offsetX', parseInt(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
+                          </div>
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Center Y</label>
+                              <span className="text-white text-[10px] font-bold">{p.offsetY}%</span>
+                            </div>
+                            <input type="range" min="-150" max="150" style={{width: '100%'}} step="1" value={p.offsetY} onChange={(e) => handleUpdateProject(adminTab, p.id, 'offsetY', parseInt(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex-1 space-y-8">
-                    <div className="flex justify-between items-center">
-                      <div className="flex-1 mr-4">
-                        <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase block mb-2">Project Label</label>
-                        <input value={p.title} onChange={(e) => handleUpdateProject(adminTab, p.id, 'title', e.target.value)} className="bg-black/50 border border-white/10 rounded-lg px-4 py-3 w-full font-bold text-white outline-none focus:border-white/30 transition-all" />
-                      </div>
-                      <button onClick={() => handleRemoveProject(adminTab, p.id)} className="mt-6 p-3 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 size={20} /></button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Fit (Scale)</label>
-                          <span className="text-white text-[10px] font-bold">{p.scale}x</span>
-                        </div>
-                        <input type="range" min="0.1" max="5" style={{width: '100%'}} step="0.05" value={p.scale} onChange={(e) => handleUpdateProject(adminTab, p.id, 'scale', parseFloat(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Center X</label>
-                          <span className="text-white text-[10px] font-bold">{p.offsetX}%</span>
-                        </div>
-                        <input type="range" min="-150" max="150" style={{width: '100%'}} step="1" value={p.offsetX} onChange={(e) => handleUpdateProject(adminTab, p.id, 'offsetX', parseInt(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-[9px] font-black text-zinc-500 tracking-widest uppercase">Center Y</label>
-                          <span className="text-white text-[10px] font-bold">{p.offsetY}%</span>
-                        </div>
-                        <input type="range" min="-150" max="150" style={{width: '100%'}} step="1" value={p.offsetY} onChange={(e) => handleUpdateProject(adminTab, p.id, 'offsetY', parseInt(e.target.value))} className="h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-              <button onClick={() => handleAddProject(adminTab)} className="w-full py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-zinc-700 hover:text-white hover:border-white/20 transition-all group">
-                <Plus size={40} className="group-hover:scale-110 transition-transform" />
-                <span className="font-black text-[10px] tracking-[0.5em] uppercase">Create {adminTab} Slot</span>
-              </button>
+                ))}
+                <button onClick={() => handleAddProject(adminTab)} className="w-full py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-zinc-700 hover:text-white hover:border-white/20 transition-all group">
+                  <Plus size={40} className="group-hover:scale-110 transition-transform" />
+                  <span className="font-black text-[10px] tracking-[0.5em] uppercase">Create {adminTab} Slot</span>
+                </button>
+              </>
             )}
-            </div>
           </div>
         </div>
       </div>
