@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle } from 'lucide-react';
+import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle, Play, Pause, SkipBack, SkipForward, Volume2, Music } from 'lucide-react';
 
 // --- Custom Discord Icon ---
 const DiscordIcon = ({ size = 20, className = "" }) => (
@@ -71,6 +71,94 @@ const AnimatedBackground = () => {
   return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
 };
 
+// --- Music Playlist Component ---
+const MusicPlaylist = ({ tracks, currentTrack, isPlaying, onPlayPause, onTrackChange }) => (
+  <div className="w-full max-w-2xl mx-auto mt-12 bg-white/[0.03] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+    <div className="flex items-center gap-3 mb-6">
+      <Music size={20} className="text-white/60" />
+      <span className="text-[10px] font-black tracking-[0.3em] uppercase text-white/40">Quantm Soundtrack</span>
+    </div>
+    
+    <div className="space-y-4">
+      {/* Current Track Display */}
+      <div className="bg-black/40 rounded-lg p-4 border border-white/5">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm truncate">{tracks[currentTrack].title}</p>
+            <p className="text-white/40 text-xs truncate">{tracks[currentTrack].artist}</p>
+          </div>
+          <span className="text-[10px] text-white/40 font-bold whitespace-nowrap">{tracks[currentTrack].duration}</span>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="w-full h-1 bg-white/10 rounded-full">
+          <div className="h-full w-1/3 bg-white rounded-full"></div>
+        </div>
+      </div>
+      
+      {/* Player Controls */}
+      <div className="flex items-center justify-center gap-4">
+        <button
+          onClick={() => onTrackChange(-1)}
+          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white"
+        >
+          <SkipBack size={18} />
+        </button>
+        
+        <button
+          onClick={onPlayPause}
+          className="p-3 rounded-lg bg-white text-black hover:bg-zinc-200 transition-all font-black"
+        >
+          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        </button>
+        
+        <button
+          onClick={() => onTrackChange(1)}
+          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-white/60 hover:text-white"
+        >
+          <SkipForward size={18} />
+        </button>
+        
+        <div className="ml-auto flex items-center gap-2">
+          <Volume2 size={16} className="text-white/40" />
+          <input
+            type="range"
+            min="0"
+            max="100"
+            defaultValue="60"
+            className="w-20 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white"
+          />
+        </div>
+      </div>
+      
+      {/* Playlist */}
+      <div className="space-y-2 mt-6 border-t border-white/5 pt-4">
+        <p className="text-[9px] font-black tracking-[0.2em] uppercase text-white/30 mb-3">Up Next</p>
+        <div className="space-y-2 max-h-32 overflow-y-auto">
+          {tracks.map((track, idx) => (
+            <button
+              key={idx}
+              onClick={() => onTrackChange(idx - currentTrack)}
+              className={`w-full text-left p-2 rounded-lg transition-all ${
+                idx === currentTrack
+                  ? 'bg-white/10 border border-white/20'
+                  : 'hover:bg-white/5 border border-transparent'
+              }`}
+            >
+              <p className={`text-xs font-bold truncate ${
+                idx === currentTrack ? 'text-white' : 'text-white/60 group-hover:text-white'
+              }`}>
+                {idx + 1}. {track.title}
+              </p>
+              <p className="text-[10px] text-white/30 truncate">{track.artist}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 // --- Portfolio Grid Item ---
 const PortfolioItem = ({ item, categoryId, onClick }) => (
   <button
@@ -118,6 +206,17 @@ export default function App() {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeSection, setActiveSection] = useState('hero');
+  
+  // Music Player State
+  const [currentTrack, setCurrentTrack] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const musicTracks = [
+    { title: 'Late Night Study', artist: 'QUANTM Lofi', duration: '3:42' },
+    { title: 'Rainy Thoughts', artist: 'QUANTM Lofi', duration: '4:15' },
+    { title: 'Coffee & Vibes', artist: 'QUANTM Lofi', duration: '3:58' },
+    { title: 'Moonlit Chill', artist: 'QUANTM Lofi', duration: '4:30' },
+    { title: 'Sunset Reflections', artist: 'QUANTM Lofi', duration: '3:20' }
+  ];
   
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -190,6 +289,19 @@ export default function App() {
       const targetPosition = rect.top + window.scrollY - targetOffset;
       window.scrollTo({ top: targetPosition, behavior: 'smooth' });
     }
+  };
+
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleTrackChange = (direction) => {
+    setCurrentTrack((prev) => {
+      const newTrack = prev + direction;
+      if (newTrack < 0) return musicTracks.length - 1;
+      if (newTrack >= musicTracks.length) return 0;
+      return newTrack;
+    });
   };
 
   // --- Login Logic ---
@@ -532,7 +644,14 @@ export default function App() {
             <span className="block tracking-tighter mb-2">QUANTM</span>
             <span className="inline-block tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/10 pr-4">STUDIOS</span>
           </h1>
-          <div className="flex flex-col sm:flex-row gap-6 justify-center mt-6">
+          <MusicPlaylist
+            tracks={musicTracks}
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            onPlayPause={handlePlayPause}
+            onTrackChange={handleTrackChange}
+          />
+          <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
             <button onClick={() => scrollToSection(null, 'pfp')} className="bg-white text-black px-12 py-4 rounded-full font-black text-[11px] tracking-[0.2em] hover:scale-105 transition-transform duration-300 shadow-2xl shadow-white/10">VIEW SHOWREEL</button>
             <button className="bg-transparent border border-white/10 px-12 py-4 rounded-full font-black text-[11px] tracking-[0.2em] hover:bg-white/5 hover:border-white/30 transition-all duration-300">GET IN TOUCH</button>
           </div>
