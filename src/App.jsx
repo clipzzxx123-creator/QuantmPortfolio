@@ -431,18 +431,46 @@ export default function App() {
     const activeTrack = musicTracks[currentTrack];
     if (!activeTrack?.url) return;
 
-    setIsPlaying((prev) => !prev);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    if (audio.src !== activeTrack.url) {
+      audio.src = activeTrack.url;
+      audio.currentTime = 0;
+      setCurrentTime(0);
+    }
+
+    audio.play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
   };
 
   const handleTrackChange = (direction) => {
     if (musicTracks.length === 0) return;
 
-    setCurrentTrack((prev) => {
-      const newTrack = prev + direction;
-      if (newTrack < 0) return musicTracks.length - 1;
-      if (newTrack >= musicTracks.length) return 0;
-      return newTrack;
-    });
+    let nextTrack = currentTrack + direction;
+    if (nextTrack < 0) nextTrack = musicTracks.length - 1;
+    if (nextTrack >= musicTracks.length) nextTrack = 0;
+
+    setCurrentTrack(nextTrack);
+
+    const audio = audioRef.current;
+    const nextSong = musicTracks[nextTrack];
+    if (audio && nextSong?.url) {
+      audio.src = nextSong.url;
+      audio.currentTime = 0;
+      setCurrentTime(0);
+
+      if (isPlaying) {
+        audio.play().catch(() => setIsPlaying(false));
+      }
+    }
   };
 
   // --- Login Logic ---
