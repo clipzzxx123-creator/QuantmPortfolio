@@ -275,19 +275,17 @@ export default function App() {
   }, [volume]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      const activeTrack = musicTracks[currentTrack];
-      if (isPlaying && activeTrack?.url) {
-        if (audioRef.current.src !== activeTrack.url) {
-          audioRef.current.src = activeTrack.url;
-          audioRef.current.load();
-        }
-        audioRef.current.play().catch(() => {
-          setIsPlaying(false);
-        });
-      } else {
-        audioRef.current.pause();
+    const audio = audioRef.current;
+    if (!audio) return;
+    const activeTrack = musicTracks[currentTrack];
+    if (isPlaying && activeTrack?.url) {
+      if (audio.src !== activeTrack.url) {
+        audio.src = activeTrack.url;
+        audio.currentTime = 0;
       }
+      audio.play().catch(() => setIsPlaying(false));
+    } else {
+      audio.pause();
     }
   }, [currentTrack, isPlaying, musicTracks]);
 
@@ -349,9 +347,7 @@ export default function App() {
         })
       );
 
-      const hasAudio = updated.some((t) => t.url);
       setMusicTracks(updated);
-      if (hasAudio) setIsPlaying(true);
     };
     loadPersistedAudio();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -483,20 +479,20 @@ export default function App() {
     });
   };
 
-  const handleMusicUpload = async (id, e) => {
+  const handleMusicUpload = (id, e) => {
     const file = e.target.files[0];
-    if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      try { await saveAudioFile(id, file); } catch {}
-      const idx = musicTracks.findIndex((s) => s.id === id);
-      setMusicTracks((prev) => prev.map((song) => {
-        if (song.id !== id) return song;
-        if (song.url?.startsWith('blob:')) URL.revokeObjectURL(song.url);
-        return { ...song, url: objectUrl, title: file.name.replace(/\.[^/.]+$/, '') };
-      }));
-      if (idx >= 0) setCurrentTrack(idx);
-      setIsPlaying(true);
-    }
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    // Save to IndexedDB in background so we stay inside the user-gesture context
+    saveAudioFile(id, file).catch(() => {});
+    const idx = musicTracks.findIndex((s) => s.id === id);
+    setMusicTracks((prev) => prev.map((song) => {
+      if (song.id !== id) return song;
+      if (song.url?.startsWith('blob:')) URL.revokeObjectURL(song.url);
+      return { ...song, url: objectUrl, title: file.name.replace(/\.[^/.]+$/, '') };
+    }));
+    if (idx >= 0) setCurrentTrack(idx);
+    setIsPlaying(true);
   };
 
   const handleOpenConcept = (section, item) => {
@@ -754,7 +750,7 @@ export default function App() {
               onClick={handleCloseConcept}
               className="text-[11px] font-black tracking-[0.25em] uppercase text-white/70 hover:text-white transition-colors"
             >
-              Back to Concepts
+              Back
             </button>
 
             <a
