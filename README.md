@@ -24,6 +24,23 @@ See the section about [running tests](https://facebook.github.io/create-react-ap
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
+## Cross-device admin sync (music)
+
+Music edits now support live sync across devices using Firebase Firestore + Firebase Storage.
+
+Create a `.env.local` file in the project root with:
+
+```
+REACT_APP_FIREBASE_API_KEY=your_api_key
+REACT_APP_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+REACT_APP_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+REACT_APP_FIREBASE_APP_ID=your_app_id
+```
+
+When these variables are present, admin music changes and MP3 uploads sync in real time on every device.
+
 The build is minified and the filenames include the hashes.\
 Your app is ready to be deployed!
 

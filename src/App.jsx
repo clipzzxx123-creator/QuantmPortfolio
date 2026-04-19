@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowUpRight, Palette, Camera, Film, Image as ImageIcon, Plus, Trash2, Eye, Lock, User, AlertCircle, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { firestore, storage, isFirebaseConfigured } from './firebase';
 
 // --- Custom Discord Icon ---
 const DiscordIcon = ({ size = 20, className = "" }) => (
@@ -8,45 +11,15 @@ const DiscordIcon = ({ size = 20, className = "" }) => (
   </svg>
 );
 
-// --- IndexedDB Audio Storage ---
-const AUDIO_DB_NAME = 'quantm_audio_db';
-const AUDIO_DB_STORE = 'audio_files';
+const MUSIC_COLLECTION = 'quantm_content';
+const MUSIC_DOC_ID = 'music';
 
-function openAudioDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(AUDIO_DB_NAME, 1);
-    req.onupgradeneeded = (e) => { e.target.result.createObjectStore(AUDIO_DB_STORE, { keyPath: 'id' }); };
-    req.onsuccess = (e) => resolve(e.target.result);
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
-function saveAudioFile(id, blob) {
-  return openAudioDB().then((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(AUDIO_DB_STORE, 'readwrite');
-    tx.objectStore(AUDIO_DB_STORE).put({ id, blob });
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject(e.target.error);
-  }));
-}
-
-function getAudioFile(id) {
-  return openAudioDB().then((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(AUDIO_DB_STORE, 'readonly');
-    const req = tx.objectStore(AUDIO_DB_STORE).get(id);
-    req.onsuccess = (e) => resolve(e.target.result?.blob || null);
-    req.onerror = (e) => reject(e.target.error);
-  }));
-}
-
-function deleteAudioFile(id) {
-  return openAudioDB().then((db) => new Promise((resolve, reject) => {
-    const tx = db.transaction(AUDIO_DB_STORE, 'readwrite');
-    tx.objectStore(AUDIO_DB_STORE).delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject(e.target.error);
-  }));
-}
+const normalizeTrack = (track) => ({
+  id: Number(track.id) || Date.now(),
+  title: track.title || 'Untitled',
+  url: (track.url?.startsWith('/') || track.url?.startsWith('http')) ? track.url : '',
+  duration: track.duration || '0:00'
+});
 
 // --- Background Component ---
 const AnimatedBackground = () => {
@@ -253,20 +226,43 @@ export default function App() {
       return [];
     }
   });
+  const cloudSyncEnabled = Boolean(isFirebaseConfigured && firestore && storage);
+
+  const persistTracks = (nextTracks) => {
+    const serializableTracks = nextTracks.map(normalizeTrack);
+
+    if (!cloudSyncEnabled) {
+      try {
+        localStorage.setItem('quantm_music_tracks_v1', JSON.stringify(serializableTracks));
+      } catch {
+        // Ignore storage failures so UI remains usable.
+      }
+      return;
+    }
+
+    setDoc(
+      doc(firestore, MUSIC_COLLECTION, MUSIC_DOC_ID),
+      { tracks: serializableTracks, updatedAt: Date.now() },
+      { merge: true }
+    ).catch(() => {});
+  };
 
   useEffect(() => {
-    // Avoid saving data/blob URLs to localStorage because large audio payloads can exceed quota.
-    const serializableTracks = musicTracks.map((track) => ({
-      ...track,
-      url: (track.url?.startsWith('/') || track.url?.startsWith('http')) ? track.url : ''
-    }));
+    if (!cloudSyncEnabled) return;
 
-    try {
-      localStorage.setItem('quantm_music_tracks_v1', JSON.stringify(serializableTracks));
-    } catch {
-      // Ignore quota/storage failures so UI remains usable.
-    }
-  }, [musicTracks]);
+    const unsubscribe = onSnapshot(
+      doc(firestore, MUSIC_COLLECTION, MUSIC_DOC_ID),
+      (snapshot) => {
+        const remoteTracks = snapshot.data()?.tracks;
+        if (Array.isArray(remoteTracks)) {
+          setMusicTracks(remoteTracks.map(normalizeTrack));
+        }
+      },
+      () => {}
+    );
+
+    return unsubscribe;
+  }, [cloudSyncEnabled]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -328,29 +324,22 @@ export default function App() {
     }
   }, [musicTracks, currentTrack]);
 
-  // Load persisted audio files from IndexedDB on page load and auto-play
+  // Local fallback hydration for setups without Firebase.
   useEffect(() => {
-    const loadPersistedAudio = async () => {
-      const saved = localStorage.getItem('quantm_music_tracks_v1');
-      if (!saved) return;
-      let tracks;
-      try { tracks = JSON.parse(saved); } catch { return; }
-      if (!Array.isArray(tracks) || tracks.length === 0) return;
+    if (cloudSyncEnabled) return;
 
-      const updated = await Promise.all(
-        tracks.map(async (track) => {
-          try {
-            const blob = await getAudioFile(track.id);
-            if (blob) return { ...track, url: URL.createObjectURL(blob) };
-          } catch {}
-          return track;
-        })
-      );
+    const saved = localStorage.getItem('quantm_music_tracks_v1');
+    if (!saved) return;
 
-      setMusicTracks(updated);
-    };
-    loadPersistedAudio();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setMusicTracks(parsed.map(normalizeTrack));
+      }
+    } catch {
+      // Ignore malformed local fallback data.
+    }
+  }, [cloudSyncEnabled]);
 
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -489,36 +478,56 @@ export default function App() {
 
   const handleAddSong = () => {
     const newSong = { id: Date.now(), title: 'New Song', url: '', duration: '0:00' };
-    setMusicTracks((prev) => [...prev, newSong]);
-  };
-
-  const handleUpdateSong = (id, field, value) => {
-    setMusicTracks((prev) => prev.map(song => song.id === id ? { ...song, [field]: value } : song));
-  };
-
-  const handleRemoveSong = (id) => {
-    deleteAudioFile(id).catch(() => {});
     setMusicTracks((prev) => {
-      const songToRemove = prev.find((song) => song.id === id);
-      if (songToRemove?.url?.startsWith('blob:')) {
-        URL.revokeObjectURL(songToRemove.url);
-      }
-      return prev.filter(song => song.id !== id);
+      const next = [...prev, newSong];
+      persistTracks(next);
+      return next;
     });
   };
 
-  const handleMusicUpload = (id, e) => {
+  const handleUpdateSong = (id, field, value) => {
+    setMusicTracks((prev) => {
+      const next = prev.map(song => song.id === id ? { ...song, [field]: value } : song);
+      persistTracks(next);
+      return next;
+    });
+  };
+
+  const handleRemoveSong = (id) => {
+    setMusicTracks((prev) => {
+      const next = prev.filter(song => song.id !== id);
+      persistTracks(next);
+      return next;
+    });
+  };
+
+  const handleMusicUpload = async (id, e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const objectUrl = URL.createObjectURL(file);
-    // Save to IndexedDB in background so we stay inside the user-gesture context
-    saveAudioFile(id, file).catch(() => {});
+
+    let trackUrl = '';
+    if (cloudSyncEnabled) {
+      try {
+        const path = `music/${id}-${Date.now()}-${file.name}`;
+        const uploaded = await uploadBytes(storageRef(storage, path), file);
+        trackUrl = await getDownloadURL(uploaded.ref);
+      } catch {
+        return;
+      }
+    } else {
+      trackUrl = URL.createObjectURL(file);
+    }
+
     const idx = musicTracks.findIndex((s) => s.id === id);
-    setMusicTracks((prev) => prev.map((song) => {
-      if (song.id !== id) return song;
-      if (song.url?.startsWith('blob:')) URL.revokeObjectURL(song.url);
-      return { ...song, url: objectUrl, title: file.name.replace(/\.[^/.]+$/, '') };
-    }));
+    setMusicTracks((prev) => {
+      const next = prev.map((song) => {
+        if (song.id !== id) return song;
+        return { ...song, url: trackUrl, title: file.name.replace(/\.[^/.]+$/, '') };
+      });
+      persistTracks(next);
+      return next;
+    });
+
     if (idx >= 0) setCurrentTrack(idx);
     setIsPlaying(true);
   };
@@ -663,6 +672,9 @@ export default function App() {
           <div className="grid grid-cols-1 gap-8">
             {adminTab === 'music' ? (
               <>
+                <div className={`rounded-xl border px-4 py-3 text-[10px] font-black tracking-[0.2em] uppercase ${cloudSyncEnabled ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                  {cloudSyncEnabled ? 'Cloud Sync Active - Music updates are live on all devices.' : 'Cloud Sync Disabled - Music updates are local to this device until Firebase is configured.'}
+                </div>
                 {musicTracks.map((song) => (
                   <div key={song.id} className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col gap-6 items-start">
                     <div className="w-full flex gap-8 items-start">
