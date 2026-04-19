@@ -208,15 +208,24 @@ export default function App() {
 
     try {
       const parsed = JSON.parse(saved);
-      // Keep only valid tracks that actually have a playable URL.
-      return Array.isArray(parsed) ? parsed.filter((track) => track?.url) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
   });
 
   useEffect(() => {
-    localStorage.setItem('quantm_music_tracks_v1', JSON.stringify(musicTracks));
+    // Avoid saving data/blob URLs to localStorage because large audio payloads can exceed quota.
+    const serializableTracks = musicTracks.map((track) => ({
+      ...track,
+      url: (track.url?.startsWith('/') || track.url?.startsWith('http')) ? track.url : ''
+    }));
+
+    try {
+      localStorage.setItem('quantm_music_tracks_v1', JSON.stringify(serializableTracks));
+    } catch {
+      // Ignore quota/storage failures so UI remains usable.
+    }
   }, [musicTracks]);
 
   useEffect(() => {
@@ -390,7 +399,7 @@ export default function App() {
 
   const handleAddSong = () => {
     const newSong = { id: Date.now(), title: 'New Song', url: '', duration: '0:00' };
-    setMusicTracks([...musicTracks, newSong]);
+    setMusicTracks((prev) => [...prev, newSong]);
   };
 
   const handleUpdateSong = (id, field, value) => {
@@ -398,24 +407,30 @@ export default function App() {
   };
 
   const handleRemoveSong = (id) => {
-    setMusicTracks((prev) => prev.filter(song => song.id !== id));
+    setMusicTracks((prev) => {
+      const songToRemove = prev.find((song) => song.id === id);
+      if (songToRemove?.url?.startsWith('blob:')) {
+        URL.revokeObjectURL(songToRemove.url);
+      }
+      return prev.filter(song => song.id !== id);
+    });
   };
 
   const handleMusicUpload = (id, e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMusicTracks((prev) => prev.map((song) => {
-          if (song.id !== id) return song;
-          return {
-            ...song,
-            url: reader.result,
-            title: file.name.replace(/\.[^/.]+$/, '')
-          };
-        }));
-      };
-      reader.readAsDataURL(file);
+      const objectUrl = URL.createObjectURL(file);
+      setMusicTracks((prev) => prev.map((song) => {
+        if (song.id !== id) return song;
+        if (song.url?.startsWith('blob:')) {
+          URL.revokeObjectURL(song.url);
+        }
+        return {
+          ...song,
+          url: objectUrl,
+          title: file.name.replace(/\.[^/.]+$/, '')
+        };
+      }));
     }
   };
 
