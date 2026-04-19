@@ -8,6 +8,46 @@ const DiscordIcon = ({ size = 20, className = "" }) => (
   </svg>
 );
 
+// --- IndexedDB Audio Storage ---
+const AUDIO_DB_NAME = 'quantm_audio_db';
+const AUDIO_DB_STORE = 'audio_files';
+
+function openAudioDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(AUDIO_DB_NAME, 1);
+    req.onupgradeneeded = (e) => { e.target.result.createObjectStore(AUDIO_DB_STORE, { keyPath: 'id' }); };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function saveAudioFile(id, blob) {
+  return openAudioDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_DB_STORE, 'readwrite');
+    tx.objectStore(AUDIO_DB_STORE).put({ id, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+function getAudioFile(id) {
+  return openAudioDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_DB_STORE, 'readonly');
+    const req = tx.objectStore(AUDIO_DB_STORE).get(id);
+    req.onsuccess = (e) => resolve(e.target.result?.blob || null);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+function deleteAudioFile(id) {
+  return openAudioDB().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_DB_STORE, 'readwrite');
+    tx.objectStore(AUDIO_DB_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+
 // --- Background Component ---
 const AnimatedBackground = () => {
   const canvasRef = useRef(null);
@@ -289,7 +329,33 @@ export default function App() {
       setCurrentTrack(musicTracks.length - 1);
     }
   }, [musicTracks, currentTrack]);
-  
+
+  // Load persisted audio files from IndexedDB on page load and auto-play
+  useEffect(() => {
+    const loadPersistedAudio = async () => {
+      const saved = localStorage.getItem('quantm_music_tracks_v1');
+      if (!saved) return;
+      let tracks;
+      try { tracks = JSON.parse(saved); } catch { return; }
+      if (!Array.isArray(tracks) || tracks.length === 0) return;
+
+      const updated = await Promise.all(
+        tracks.map(async (track) => {
+          try {
+            const blob = await getAudioFile(track.id);
+            if (blob) return { ...track, url: URL.createObjectURL(blob) };
+          } catch {}
+          return track;
+        })
+      );
+
+      const hasAudio = updated.some((t) => t.url);
+      setMusicTracks(updated);
+      if (hasAudio) setIsPlaying(true);
+    };
+    loadPersistedAudio();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -407,6 +473,7 @@ export default function App() {
   };
 
   const handleRemoveSong = (id) => {
+    deleteAudioFile(id).catch(() => {});
     setMusicTracks((prev) => {
       const songToRemove = prev.find((song) => song.id === id);
       if (songToRemove?.url?.startsWith('blob:')) {
@@ -416,21 +483,19 @@ export default function App() {
     });
   };
 
-  const handleMusicUpload = (id, e) => {
+  const handleMusicUpload = async (id, e) => {
     const file = e.target.files[0];
     if (file) {
       const objectUrl = URL.createObjectURL(file);
+      try { await saveAudioFile(id, file); } catch {}
+      const idx = musicTracks.findIndex((s) => s.id === id);
       setMusicTracks((prev) => prev.map((song) => {
         if (song.id !== id) return song;
-        if (song.url?.startsWith('blob:')) {
-          URL.revokeObjectURL(song.url);
-        }
-        return {
-          ...song,
-          url: objectUrl,
-          title: file.name.replace(/\.[^/.]+$/, '')
-        };
+        if (song.url?.startsWith('blob:')) URL.revokeObjectURL(song.url);
+        return { ...song, url: objectUrl, title: file.name.replace(/\.[^/.]+$/, '') };
       }));
+      if (idx >= 0) setCurrentTrack(idx);
+      setIsPlaying(true);
     }
   };
 
